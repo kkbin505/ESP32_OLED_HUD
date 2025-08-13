@@ -3,9 +3,11 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+// #define DEMO_MODE
+
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-#define OLED_RESET    -1
+#define OLED_RESET -1
 #define I2C_SCL_PIN 13
 #define I2C_SDA_PIN 12
 #define RX1_PIN 8
@@ -15,14 +17,14 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 // 模拟数据
 float roll = 0;
 float pitch = 0;
-float sim_speed = 50;   // m/s
-float sim_alt = 100;    // m
-int   heading = 0;
+float sim_speed = 50; // m/s
+float sim_alt = 100;  // m
+int heading = 0;
 
 String inputLine = "";
 
-void drawHUD(float roll, float pitch, float groundspeed, float altitude, int heading) {
-
+void drawHUD(float roll, float pitch, float groundspeed, float altitude, int heading)
+{
 
   // 顶部航向
   display.setTextSize(1);
@@ -48,7 +50,8 @@ void drawHUD(float roll, float pitch, float groundspeed, float altitude, int hea
 
   // 左侧速度标尺
   int speedBaseY = SCREEN_HEIGHT / 2;
-  for (int i = -2; i <= 2; i++) {
+  for (int i = -2; i <= 2; i++)
+  {
     int speedMark = (int)groundspeed + (i * 10);
     int y = speedBaseY + (i * 10);
     display.drawLine(0, y, 8, y, SSD1306_WHITE);
@@ -58,48 +61,50 @@ void drawHUD(float roll, float pitch, float groundspeed, float altitude, int hea
 
   // 右侧高度标尺
   int altBaseY = SCREEN_HEIGHT / 2;
-  for (int i = -2; i <= 2; i++) {
+  for (int i = -2; i <= 2; i++)
+  {
     int altMark = (int)altitude + (i * 10);
     int y = altBaseY + (i * 10);
     display.drawLine(SCREEN_WIDTH - 8, y, SCREEN_WIDTH, y, SSD1306_WHITE);
     display.setCursor(SCREEN_WIDTH - 28, y - 3);
     display.printf("%d", altMark);
   }
-
-
 }
 
-void drawPitch(float pitch) {
-//   // 屏幕中心Y坐标
-   int centerY = SCREEN_HEIGHT / 2;
+void drawPitch(float pitch)
+{
+  //   // 屏幕中心Y坐标
+  int centerY = SCREEN_HEIGHT / 2;
 
-//   // 计算偏移量，pitch 每度对应多少像素，这个比例你可以调节
-//   // 例如每度对应 2 像素，高度 64，最大 +/- 32度会移动64像素
-//   float pixelsPerDegree = 2.0f;
+  //   // 计算偏移量，pitch 每度对应多少像素，这个比例你可以调节
+  //   // 例如每度对应 2 像素，高度 64，最大 +/- 32度会移动64像素
+  //   float pixelsPerDegree = 2.0f;
 
-//   // pitch 反向移动线条：pitch正，线条往下移（加像素）
-//   int lineY = centerY + (int)(pitch * pixelsPerDegree);
+  //   // pitch 反向移动线条：pitch正，线条往下移（加像素）
+  //   int lineY = centerY + (int)(pitch * pixelsPerDegree);
 
-//   // 限制线条不跑出屏幕
-//   if (lineY < 0) lineY = 0;
-//   if (lineY > SCREEN_HEIGHT - 1) lineY = SCREEN_HEIGHT - 1;
+  //   // 限制线条不跑出屏幕
+  //   if (lineY < 0) lineY = 0;
+  //   if (lineY > SCREEN_HEIGHT - 1) lineY = SCREEN_HEIGHT - 1;
 
-//   display.clearDisplay();
+  //   display.clearDisplay();
 
-//   // 画水平线，代表pitch=0的位置
-//   display.drawLine(0, lineY, SCREEN_WIDTH, lineY, SSD1306_WHITE);
+  //   // 画水平线，代表pitch=0的位置
+  //   display.drawLine(0, lineY, SCREEN_WIDTH, lineY, SSD1306_WHITE);
 
   // 显示当前pitch数字，固定在屏幕中间（你也可以调整位置）
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor((SCREEN_WIDTH - 6 * 3 * 2) / 2, centerY - 60);
-  if (pitch >= 0) display.print("+");
+  if (pitch >= 0)
+    display.print("+");
   display.print("P:");
   display.print((int)pitch);
   display.print("o");
 }
 
-void parseData(const String& data) {
+void parseData(const String &data)
+{
   float pitch = 0, roll = 0, yaw = 0;
   int s1 = 0, s2 = 0, flight = 0;
 
@@ -111,7 +116,8 @@ void parseData(const String& data) {
   int p5 = data.indexOf(",S2:");
   int p6 = data.indexOf(",Flight:");
 
-  if (p1 != -1 && p2 != -1 && p3 != -1 && p4 != -1 && p5 != -1 && p6 != -1) {
+  if (p1 != -1 && p2 != -1 && p3 != -1 && p4 != -1 && p5 != -1 && p6 != -1)
+  {
     pitch = data.substring(p1 + 2, p2).toFloat();
     roll = data.substring(p2 + 3, p3).toFloat();
     yaw = data.substring(p3 + 3, p4).toFloat();
@@ -119,22 +125,27 @@ void parseData(const String& data) {
     s2 = data.substring(p5 + 4, p6).toInt();
     flight = data.substring(p6 + 8).toInt();
 
-    Serial.printf("Parsed pitch=%.2f, roll=%.2f, yaw=%.2f, s1=%d, s2=%d, flight=%d\n", 
-                   pitch, roll, yaw, s1, s2, flight);
-  } else {
+    Serial.printf("Parsed pitch=%.2f, roll=%.2f, yaw=%.2f, s1=%d, s2=%d, flight=%d\n",
+                  pitch, roll, yaw, s1, s2, flight);
+  }
+  else
+  {
     Serial.println("Parse error: format mismatch");
   }
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   // 初始化UART1，设置TX和RX引脚
   Serial1.begin(115200, SERIAL_8N1, RX1_PIN, TX1_PIN);
 
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
+  {
     Serial.println(F("SSD1306 allocation failed"));
-    for(;;);
+    for (;;)
+      ;
   }
   display.setRotation(2);
   display.clearDisplay();
@@ -142,23 +153,32 @@ void setup() {
   display.setTextColor(SSD1306_WHITE);
 }
 
-void loop() {
+void loop()
+{
+#ifdef DEMO_MODE
+
   // 模拟动画
-  // sim_speed = 50 + sin(millis() / 2000.0) * 10; // 40~60 m/s
-  // sim_alt = 100 + sin(millis() / 2500.0) * 20;  // 80~120 m
-  // 解析：
-  while (Serial1.available()) {
+  sim_speed = 50 + sin(millis() / 2000.0) * 10; // 40~60 m/s
+  sim_alt = 100 + sin(millis() / 2500.0) * 20;  // 80~120 m
+// 解析：
+#else
+  while (Serial1.available())
+  {
     char c = Serial1.read();
-    if (c == '\n') {
+    if (c == '\n')
+    {
       // 收到一行完整数据，开始解析
       Serial.print("Received: ");
       Serial.println(inputLine);
       parseData(inputLine);
       inputLine = "";
-    } else if (c != '\r') {
+    }
+    else if (c != '\r')
+    {
       inputLine += c; // 拼接数据行
     }
   }
+#endif
 
   display.clearDisplay();
   drawPitch(pitch);
