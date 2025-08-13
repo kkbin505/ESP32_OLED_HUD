@@ -21,7 +21,12 @@ float sim_speed = 50; // m/s
 float sim_alt = 100;  // m
 int heading = 0;
 
+//  float pitch = 0, roll = 0, yaw = 0;
+int s1 = 0, s2 = 0, flight = 0;
+
 String inputLine = "";
+
+bool signalReceived = false;
 
 void drawHUD(float roll, float pitch, float groundspeed, float altitude, int heading)
 {
@@ -34,6 +39,8 @@ void drawHUD(float roll, float pitch, float groundspeed, float altitude, int hea
   // 中心点
   int cx = SCREEN_WIDTH / 2;
   int cy = SCREEN_HEIGHT / 2 + 8;
+  //   // 屏幕中心Y坐标
+  int centerY = SCREEN_HEIGHT / 2;
 
   // 地平线 (一根线)
   float rollRad = roll * M_PI / 180.0;
@@ -69,12 +76,6 @@ void drawHUD(float roll, float pitch, float groundspeed, float altitude, int hea
     display.setCursor(SCREEN_WIDTH - 28, y - 3);
     display.printf("%d", altMark);
   }
-}
-
-void drawPitch(float pitch)
-{
-  //   // 屏幕中心Y坐标
-  int centerY = SCREEN_HEIGHT / 2;
 
   //   // 计算偏移量，pitch 每度对应多少像素，这个比例你可以调节
   //   // 例如每度对应 2 像素，高度 64，最大 +/- 32度会移动64像素
@@ -103,10 +104,22 @@ void drawPitch(float pitch)
   display.print("o");
 }
 
+void drawSignalLost()
+{
+
+  // 顶部航向
+  display.setTextSize(2);
+  display.setCursor((SCREEN_WIDTH / 2) - 60, 0);
+  display.printf("Singal Lost!!");
+
+  // 中心点
+  int cx = SCREEN_WIDTH / 2;
+  int cy = SCREEN_HEIGHT / 2 + 8;
+  //   // 屏幕中心Y坐标
+  int centerY = SCREEN_HEIGHT / 2;
+}
 void parseData(const String &data)
 {
-  float pitch = 0, roll = 0, yaw = 0;
-  int s1 = 0, s2 = 0, flight = 0;
 
   // 使用正则或者简单字符串查找解析，示例用String的indexOf和substring
   int p1 = data.indexOf("P:");
@@ -120,17 +133,19 @@ void parseData(const String &data)
   {
     pitch = data.substring(p1 + 2, p2).toFloat();
     roll = data.substring(p2 + 3, p3).toFloat();
-    yaw = data.substring(p3 + 3, p4).toFloat();
+    heading = data.substring(p3 + 3, p4).toFloat();
     s1 = data.substring(p4 + 4, p5).toInt();
     s2 = data.substring(p5 + 4, p6).toInt();
     flight = data.substring(p6 + 8).toInt();
 
     Serial.printf("Parsed pitch=%.2f, roll=%.2f, yaw=%.2f, s1=%d, s2=%d, flight=%d\n",
-                  pitch, roll, yaw, s1, s2, flight);
+                  pitch, roll, heading, s1, s2, flight);
+    signalReceived = true;
   }
   else
   {
     Serial.println("Parse error: format mismatch");
+    signalReceived = false;
   }
 }
 
@@ -155,6 +170,7 @@ void setup()
 
 void loop()
 {
+  display.clearDisplay();
 #ifdef DEMO_MODE
 
   // 模拟动画
@@ -178,11 +194,20 @@ void loop()
       inputLine += c; // 拼接数据行
     }
   }
+
 #endif
 
-  display.clearDisplay();
-  drawPitch(pitch);
-  drawHUD(roll, pitch, sim_speed, sim_alt, heading);
+  if (signalReceived == true)
+  {
+
+    drawHUD(roll, pitch, sim_speed, sim_alt, heading);
+  }
+  else
+  {
+
+    drawSignalLost();
+  }
+
   display.display();
 
   delay(50);
