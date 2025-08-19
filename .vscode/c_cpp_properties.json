@@ -10,6 +10,9 @@
             "includePath": [
                 "D:/LiZhen/Github/ESP32_OLED_HUD/include",
                 "D:/LiZhen/Github/ESP32_OLED_HUD/src",
+                "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/common",
+                "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/CrsfSerial",
+                "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/crc8",
                 "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/Adafruit SSD1306",
                 "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/Adafruit GFX Library",
                 "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/Adafruit BusIO",
@@ -252,6 +255,9 @@
                 "path": [
                     "D:/LiZhen/Github/ESP32_OLED_HUD/include",
                     "D:/LiZhen/Github/ESP32_OLED_HUD/src",
+                    "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/common",
+                    "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/CrsfSerial",
+                    "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/crc8",
                     "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/Adafruit SSD1306",
                     "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/Adafruit GFX Library",
                     "D:/LiZhen/Github/ESP32_OLED_HUD/.pio/libdeps/esp32-s3-devkitc-1/Adafruit BusIO",

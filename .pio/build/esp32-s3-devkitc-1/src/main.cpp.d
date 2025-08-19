@@ -188,4 +188,7 @@
  .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ BusIO/Adafruit_SPIDevice.h \
  C:/Users/dell/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src/SPI.h \
  C:/Users/dell/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-spi.h \
- .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ SSD1306/Adafruit_SSD1306.h
+ .pio/libdeps/esp32-s3-devkitc-1/Adafruit\ SSD1306/Adafruit_SSD1306.h \
+ .pio/libdeps/esp32-s3-devkitc-1/CrsfSerial/CrsfSerial.h \
+ .pio/libdeps/esp32-s3-devkitc-1/crc8/crc8.h \
+ .pio/libdeps/esp32-s3-devkitc-1/CrsfSerial/crsf_protocol.h

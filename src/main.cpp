@@ -1,10 +1,22 @@
+/*
+  CRSF decode from:
+  https://github.com/CapnBry/CRServoF
+  OLED:
+  adafruit/Adafruit SSD1306@^2.5.9
+  adafruit/Adafruit GFX Library@^1.11.9
+
+*/
+
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <CrsfSerial.h>
+#include <crsf_protocol.h>
+
+#define CRSF
 
 // #define DEMO_MODE
-
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
@@ -12,7 +24,13 @@
 #define I2C_SDA_PIN 12
 #define RX1_PIN 8
 #define TX1_PIN 9
+#define SERVO_MIN 1000
+#define SERVO_CENTER 1500
+#define SERVO_MAX 2000
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+unsigned long lastOledUpdate = 0;
+const uint16_t OLED_UPDATE_MS = 100; // 10 Hz 更新
 
 // 模拟数据
 float roll = 0;
@@ -27,6 +45,45 @@ int s1 = 0, s2 = 0, flight = 0;
 String inputLine = "";
 
 bool signalReceived = false;
+
+// CRSF
+void crsfLinkUp();
+void crsfLinkDown();
+void onCrsfChannels();
+
+#ifdef CRSF
+
+#define CRSF_RX_PIN 8
+#define CRSF_TX_PIN 9
+// crsf解码
+int crsfChannelValues[CRSF_NUM_CHANNELS + 1];
+CrsfSerial crsf(Serial1);
+// CRSF failsafe:
+// 失控保护值数组，索引与通道枚举值对应（忽略索引0）
+unsigned int channelFailsafe[CRSF_NUM_CHANNELS + 1] = {
+    0,            // 索引0未使用（通道从1开始）
+    SERVO_CENTER, // CH_ROLL (1) - 横滚
+    SERVO_CENTER, // CH_PITCH (2) - 俯仰
+    SERVO_MIN,    // CH_THROTTLE (3) - 油门（失控时最小，确保安全）
+    SERVO_CENTER, // CH_YAW (4) - 偏航
+    SERVO_CENTER, // CH_ARM (5) - 解锁（用于ExpressLRS的油门切断）
+    SERVO_MAX,    // CH_AUX1 (6) - 模式切换，默认为Angle模式
+    SERVO_CENTER, // CH_AUX2 (7) - LED控制
+    SERVO_CENTER, // CH_AUX3 (8) - Buzzer
+    SERVO_CENTER, // CH_AUX4 (9) - 待定义
+    SERVO_CENTER, // CH_AUX5 (10) - 待定义
+    SERVO_CENTER, // CH_AUX6 (11) - 待定义
+    SERVO_CENTER, // CH_AUX7 (12) - 待定义
+    SERVO_CENTER, // CH_AUX8 (13) - 待定义
+    SERVO_CENTER, // CH_AUX9 (14) - 待定义
+    SERVO_CENTER, // CH_AUX10 (15) - 待定义
+    SERVO_CENTER  // CH_AUX11 (16) - 待定义
+};
+unsigned long lastCrsfPacketTime = 0;  // 上一包时间
+unsigned long lastFramerateUpdate = 0; // OLED 刷新计时
+float crsfFreshRate = 0;               // 显示值
+float crsfFreshRateMax = 0;            // 当前秒的最高刷新率
+#endif
 
 void drawHUD(float roll, float pitch, float groundspeed, float altitude, int heading)
 {
@@ -118,6 +175,7 @@ void drawSignalLost()
   //   // 屏幕中心Y坐标
   int centerY = SCREEN_HEIGHT / 2;
 }
+
 void parseData(const String &data)
 {
 
@@ -149,23 +207,53 @@ void parseData(const String &data)
   }
 }
 
+void displayCRSF();
+
 void setup()
 {
   Serial.begin(115200);
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  // 初始化UART1，设置TX和RX引脚
-  Serial1.begin(115200, SERIAL_8N1, RX1_PIN, TX1_PIN);
-
+  Wire.setClock(400000); // 把 I2C 提速到 400kHz（默认通常是 100kHz）
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   {
     Serial.println(F("SSD1306 allocation failed"));
     for (;;)
       ;
   }
-  display.setRotation(2);
+
+#ifdef CRSF
+  Serial1.setRxBufferSize(1024);
+  Serial1.begin(420000, SERIAL_8N1, CRSF_RX_PIN, CRSF_TX_PIN);
+  Serial.println("Serial1 started for CRSF");
+  // 初始化 failsafe（1-based）
+  for (uint8_t i = 0; i <= CRSF_NUM_CHANNELS; ++i)
+  {
+    if (i == 0)
+      channelFailsafe[i] = 0;
+    else if (i == 3)
+      channelFailsafe[i] = SERVO_MIN; // throttle 最小
+    else
+      channelFailsafe[i] = SERVO_CENTER;
+    // 初始化工作数组
+    crsfChannelValues[i] = channelFailsafe[i];
+  }
+  // 初始化CRSF
+  crsf.onLinkUp = crsfLinkUp;
+  crsf.onLinkDown = crsfLinkDown;
+  crsf.onPacketChannels = onCrsfChannels;
+  crsf.begin();
+  Serial.println("CRSF begin called");
+#else
+  // 初始化UART1，设置TX和RX引脚
+  Serial1.begin(115200, SERIAL_8N1, RX1_PIN, TX1_PIN);
+
+#endif
+  display.setRotation(0);
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
+  display.printf("Waiting for data");
+  display.display();
 }
 
 void loop()
@@ -197,6 +285,11 @@ void loop()
 
 #endif
 
+#ifdef CRSF
+  crsf.loop();
+  displayCRSF();
+#else
+
   if (signalReceived == true)
   {
 
@@ -207,8 +300,92 @@ void loop()
 
     drawSignalLost();
   }
-
   display.display();
+#endif
 
-  delay(50);
+  // delay(50);
 }
+
+#ifdef CRSF
+void displayCRSF()
+{
+  display.setCursor(70, 0); // OLED 最下面一行
+  unsigned long now = millis();
+  if (now - lastFramerateUpdate >= 5000) // 每秒更新一次
+  {
+    crsfFreshRate = crsfFreshRateMax; // 显示当前秒的最高刷新率
+    crsfFreshRateMax = 0;             // 重置下一秒的最大值
+    lastFramerateUpdate = now;
+
+  }
+  display.printf("%.fHz", crsfFreshRate);
+
+  if (now - lastOledUpdate < OLED_UPDATE_MS)
+    return; // 控制刷新频率
+  lastOledUpdate = now;
+  for (int i = 0; i < 8; i++)
+  {
+    // 映射到 0 ~ 100 （条形宽度）
+    // int barWidth = map(val, CRSF_ELIMIT_US_MIN, CRSF_ELIMIT_US_MAX, 0, 80);
+    int channnelVal = crsfChannelValues[i + 1];
+
+    int y = i * 8; // 每条占 8 像素高度
+    display.setCursor(0, y);
+    display.printf("CH%d:", i + 1);
+
+    String strNum = String(channnelVal);
+
+    // 计算字符串像素宽度
+    int16_t x1, y1;
+    uint16_t w, h;
+    display.getTextBounds(strNum, 0, 0, &x1, &y1, &w, &h);
+
+    // 让它靠右对齐，屏幕宽度减去字符串宽度
+    int x = SCREEN_WIDTH - w - 64;
+
+    display.setCursor(x, y);
+    display.printf("%d", channnelVal); // val 是 int;
+    Serial.println(channnelVal);
+
+    // 画条
+    // display.drawRect(30, y, 80, 7, SSD1306_WHITE);       // 外框
+    // display.fillRect(30, y, barWidth, 7, SSD1306_WHITE); // 填充
+    // Serial.println("Printing");
+  }
+  // 在底部显示快速调试信息
+
+  display.display(); // 只调用一次，提交本次所有改动
+}
+
+void crsfLinkUp()
+{
+  Serial.println("ELRS OK");
+}
+
+void crsfLinkDown()
+{
+  for (uint8_t i = 0; i < CRSF_NUM_CHANNELS; i++)
+  {
+    crsfChannelValues[i] = channelFailsafe[i];
+  }
+  Serial.println("ELRS LOSt");
+}
+
+void onCrsfChannels()
+{
+  for (uint8_t i = 0; i < CRSF_NUM_CHANNELS; i++)
+  {
+    crsfChannelValues[i] = crsf.getChannel(i);
+  }
+  // 计算刷新率
+  unsigned long now = millis();
+  if (lastCrsfPacketTime > 0)
+  {
+    float dt = (now - lastCrsfPacketTime) / 1000.0; // 秒
+    float instRate = 1.0 / dt;
+    if (instRate > crsfFreshRateMax)
+      crsfFreshRateMax = instRate;
+  }
+  lastCrsfPacketTime = now;
+}
+#endif
