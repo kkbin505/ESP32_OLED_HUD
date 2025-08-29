@@ -311,7 +311,7 @@ void displayCRSF()
 {
   display.setCursor(70, 0); // OLED 最下面一行
   unsigned long now = millis();
-  if (now - lastFramerateUpdate >= 5000) // 每秒更新一次
+  if (now - lastFramerateUpdate >= 5000) // 每5秒更新一次
   {
     crsfFreshRate = crsfFreshRateMax; // 显示当前秒的最高刷新率
     crsfFreshRateMax = 0;             // 重置下一秒的最大值
