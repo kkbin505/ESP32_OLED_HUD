@@ -2,49 +2,74 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <D:\LiZhen\Github\c_library_v2\common\mavlink.h>
 
-// #define DEMO_MODE
+// #define DEMO_MODE  // 打开此行启用模拟模式
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 #define I2C_SCL_PIN 13
 #define I2C_SDA_PIN 12
-#define RX1_PIN 8
-#define TX1_PIN 9
+#define RX1_PIN 9
+#define TX1_PIN 8
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// 模拟数据
+// 飞行数据
 float roll = 0;
 float pitch = 0;
 float sim_speed = 50; // m/s
 float sim_alt = 100;  // m
 int heading = 0;
-
-//  float pitch = 0, roll = 0, yaw = 0;
 int s1 = 0, s2 = 0, flight = 0;
 
-String inputLine = "";
-
 bool signalReceived = false;
+unsigned long lastMsgTime = 0;
+const unsigned long SIGNAL_TIMEOUT = 1000; // 1秒无消息判为丢失
 
+// MAVLink 处理函数
+void handleMavlink(mavlink_message_t &msg)
+{
+  lastMsgTime = millis(); // 收到任何有效 MAVLink 消息，更新时间
+  switch (msg.msgid)
+  {
+  case MAVLINK_MSG_ID_ATTITUDE:
+  {
+    mavlink_attitude_t att;
+    mavlink_msg_attitude_decode(&msg, &att);
+    roll = att.roll * 57.2958; // rad -> deg
+    pitch = att.pitch * 57.2958;
+    heading = int(att.yaw * 57.2958) % 360;
+    break;
+  }
+  case MAVLINK_MSG_ID_VFR_HUD:
+  {
+    mavlink_vfr_hud_t hud;
+    mavlink_msg_vfr_hud_decode(&msg, &hud);
+    sim_speed = hud.groundspeed;
+    sim_alt = hud.alt;
+    break;
+  }
+  case MAVLINK_MSG_ID_HEARTBEAT:
+    break;
+  default:
+    break;
+  }
+}
+
+// HUD 绘制函数
 void drawHUD(float roll, float pitch, float groundspeed, float altitude, int heading)
 {
-
-  // 顶部航向
   display.setTextSize(1);
   display.setCursor((SCREEN_WIDTH / 2) - 15, 0);
   display.printf("HDG:%03d", heading);
 
-  // 中心点
   int cx = SCREEN_WIDTH / 2;
   int cy = SCREEN_HEIGHT / 2 + 8;
-  //   // 屏幕中心Y坐标
-  int centerY = SCREEN_HEIGHT / 2;
+  float rollRad = -roll * M_PI / 180.0;
+  float pitchOffset = pitch * 0.8;
 
-  // 地平线 (一根线)
-  float rollRad = roll * M_PI / 180.0;
-  float pitchOffset = pitch * 0.8; // 像素偏移比例
   int x1 = cx - 60 * cos(rollRad);
   int y1 = cy + pitchOffset + 60 * sin(rollRad);
   int x2 = cx + 60 * cos(rollRad);
@@ -77,26 +102,9 @@ void drawHUD(float roll, float pitch, float groundspeed, float altitude, int hea
     display.printf("%d", altMark);
   }
 
-  //   // 计算偏移量，pitch 每度对应多少像素，这个比例你可以调节
-  //   // 例如每度对应 2 像素，高度 64，最大 +/- 32度会移动64像素
-  //   float pixelsPerDegree = 2.0f;
-
-  //   // pitch 反向移动线条：pitch正，线条往下移（加像素）
-  //   int lineY = centerY + (int)(pitch * pixelsPerDegree);
-
-  //   // 限制线条不跑出屏幕
-  //   if (lineY < 0) lineY = 0;
-  //   if (lineY > SCREEN_HEIGHT - 1) lineY = SCREEN_HEIGHT - 1;
-
-  //   display.clearDisplay();
-
-  //   // 画水平线，代表pitch=0的位置
-  //   display.drawLine(0, lineY, SCREEN_WIDTH, lineY, SSD1306_WHITE);
-
-  // 显示当前pitch数字，固定在屏幕中间（你也可以调整位置）
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor((SCREEN_WIDTH - 6 * 3 * 2) / 2, centerY - 60);
+  display.setCursor((SCREEN_WIDTH - 6 * 3 * 2) / 2, SCREEN_HEIGHT / 2 - 60);
   if (pitch >= 0)
     display.print("+");
   display.print("P:");
@@ -104,56 +112,19 @@ void drawHUD(float roll, float pitch, float groundspeed, float altitude, int hea
   display.print("o");
 }
 
+// Signal Lost 绘制
 void drawSignalLost()
 {
-
-  // 顶部航向
   display.setTextSize(2);
   display.setCursor((SCREEN_WIDTH / 2) - 60, 0);
-  display.printf("Singal Lost!!");
-
-  // 中心点
-  int cx = SCREEN_WIDTH / 2;
-  int cy = SCREEN_HEIGHT / 2 + 8;
-  //   // 屏幕中心Y坐标
-  int centerY = SCREEN_HEIGHT / 2;
-}
-void parseData(const String &data)
-{
-
-  // 使用正则或者简单字符串查找解析，示例用String的indexOf和substring
-  int p1 = data.indexOf("P:");
-  int p2 = data.indexOf(",R:");
-  int p3 = data.indexOf(",Y:");
-  int p4 = data.indexOf(",S1:");
-  int p5 = data.indexOf(",S2:");
-  int p6 = data.indexOf(",Flight:");
-
-  if (p1 != -1 && p2 != -1 && p3 != -1 && p4 != -1 && p5 != -1 && p6 != -1)
-  {
-    pitch = data.substring(p1 + 2, p2).toFloat();
-    roll = data.substring(p2 + 3, p3).toFloat();
-    heading = data.substring(p3 + 3, p4).toFloat();
-    s1 = data.substring(p4 + 4, p5).toInt();
-    s2 = data.substring(p5 + 4, p6).toInt();
-    flight = data.substring(p6 + 8).toInt();
-
-    Serial.printf("Parsed pitch=%.2f, roll=%.2f, yaw=%.2f, s1=%d, s2=%d, flight=%d\n",
-                  pitch, roll, heading, s1, s2, flight);
-    signalReceived = true;
-  }
-  else
-  {
-    Serial.println("Parse error: format mismatch");
-    signalReceived = false;
-  }
+  display.printf("Signal Lost!!");
 }
 
+// ------------------- setup -------------------
 void setup()
 {
   Serial.begin(115200);
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  // 初始化UART1，设置TX和RX引脚
   Serial1.begin(115200, SERIAL_8N1, RX1_PIN, TX1_PIN);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
@@ -166,49 +137,66 @@ void setup()
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
+
+  lastMsgTime = millis();
 }
 
+// ------------------- loop -------------------
 void loop()
 {
   display.clearDisplay();
-#ifdef DEMO_MODE
 
-  // 模拟动画
-  sim_speed = 50 + sin(millis() / 2000.0) * 10; // 40~60 m/s
-  sim_alt = 100 + sin(millis() / 2500.0) * 20;  // 80~120 m
-// 解析：
+#ifdef DEMO_MODE
+  // 模拟飞行数据
+  sim_speed = 50 + sin(millis() / 2000.0) * 10;
+  sim_alt = 100 + sin(millis() / 2500.0) * 20;
+  roll = sin(millis() / 2000.0) * 30;
+  pitch = sin(millis() / 2500.0) * 15;
+  heading = (millis() / 100) % 360;
+  signalReceived = true;
 #else
+  mavlink_message_t msg;
+  mavlink_status_t status;
+
   while (Serial1.available())
   {
-    char c = Serial1.read();
-    if (c == '\n')
+    uint8_t c = Serial1.read();
+    if (mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
     {
-      // 收到一行完整数据，开始解析
-      Serial.print("Received: ");
-      Serial.println(inputLine);
-      parseData(inputLine);
-      inputLine = "";
-    }
-    else if (c != '\r')
-    {
-      inputLine += c; // 拼接数据行
+      handleMavlink(msg);
     }
   }
 
+  while (Serial1.available())
+  {
+    uint8_t c = Serial1.read();
+    Serial.write(c); // 先把收到的原始字节打印出来
+    if (mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
+    {
+      handleMavlink(msg);
+    }
+  }
+
+      // 超时判断
+      if (millis() - lastMsgTime > SIGNAL_TIMEOUT)
+  {
+    signalReceived = false;
+  }
+  else
+  {
+    signalReceived = true;
+  }
 #endif
 
-  if (signalReceived == true)
+  if (signalReceived)
   {
-
     drawHUD(roll, pitch, sim_speed, sim_alt, heading);
   }
   else
   {
-
     drawSignalLost();
   }
 
   display.display();
-
   delay(50);
 }
