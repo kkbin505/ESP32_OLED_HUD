@@ -86,3 +86,8 @@ Dependencies managed by PlatformIO:
 
 Support:
 https://www.lcdwiki.com/2.8inch_ESP32-S3_Display
+
+todo:
+More parameter support
+esp now wireless telemetry support
+Tiny ground station with out PC
